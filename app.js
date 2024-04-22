@@ -4,10 +4,11 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var bodyParser = require('body-parser');
-var app = express();
 const db = require('./database');
 const bcrypt = require('bcrypt');
-const cors = require('cors')
+const cors = require('cors');
+const session = require('express-session');
+const app = express();
 
 
 
@@ -18,6 +19,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(bodyParser.json())
+
+app.use(session({
+  secret: 'skillodyssey',
+  resave: false,
+  saveUninitialized: false
+}));
 
 app.use(
   cors({
@@ -33,26 +40,27 @@ app.post('/login', async(req, res, next)=>{
 
   try{
     const userSearch = "SELECT * FROM userdetails WHERE Username = ?";
-    console.log(username)
     const user_query = db.format(userSearch,[username]);
     const [result] = await db.promise().query(user_query);
+    console.log(result);
     
     if (result.length === 0){
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: 'User does not exist' });
     }
 
     const hashedPassword = result[0].Password;
-    console.log(hashedPassword)
-    if(await bcrypt.compare(hashedPassword, password)){
-      console.log(password);
-      req.session.userID = result[0].user_ID;
+    console.log(hashedPassword);
+    const match = await bcrypt.compare(password, hashedPassword);
+    console.log(password);
+    if(match){
+      req.session.user_ID = result[0].user_ID;
       req.session.isLoggedIn = true;
 
     } else {
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: 'Invalid password' });
     }
 
-  } catch {
+  } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'An unexpected error occurred' });
   }
