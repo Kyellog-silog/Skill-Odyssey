@@ -8,9 +8,8 @@ const db = require('./database');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const session = require('express-session');
+const { escape } = require('querystring');
 const app = express();
-
-
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
@@ -19,11 +18,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(bodyParser.json())
+app.use(express.json());
 
 app.use(session({
   secret: 'skillodyssey',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {secure: false}
 }));
 
 app.use(
@@ -45,6 +46,7 @@ app.post('/login', async(req, res, next)=>{
     console.log(result);
     
     if (result.length === 0){
+      console.log("user does not exit")
       return res.status(401).json({ message: 'User does not exist' });
     }
 
@@ -54,9 +56,11 @@ app.post('/login', async(req, res, next)=>{
     console.log(password);
     if(match){
       req.session.user_ID = result[0].user_ID;
-      req.session.isLoggedIn = true;
+      req.session.isLoggedIn = true;  
+      res.json({message: 'Login Successful'});
 
     } else {
+      console.log("invalid password ")
       return res.status(401).json({ message: 'Invalid password' });
     }
 
@@ -65,6 +69,24 @@ app.post('/login', async(req, res, next)=>{
     return res.status(500).json({ message: 'An unexpected error occurred' });
   }
 })
+
+app.get('/protected-route', (req,res) =>{
+  if (req.session.isLoggedIn){
+    res.send('Logged In!')
+  } else {
+    res.status(403).send('Access Denied')
+  }
+})
+
+app.get('/user-status', (req, res) => {
+  if (req.session && req.session.isLoggedIn) {
+    res.json({ isLoggedIn: true });
+  } else {
+    res.json({ isLoggedIn: false });
+  }
+});
+
+
 
 app.post('/signup', async (req, res, next) => {
   const username = req.body.name; 
@@ -91,8 +113,7 @@ app.post('/signup', async (req, res, next) => {
     const sqlQuery = db.format(sqlInsert, [username, email, hashedPassword]);
 
     await db.promise().query(sqlQuery);
-
-
+ 
   
     res.status(201).json({ message: 'User created successfully!' });
     console.log("User Created succesfully")
